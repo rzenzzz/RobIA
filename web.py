@@ -13,7 +13,7 @@ except:
 
 # --- INTERFAZ ---
 st.title("🤖 Rob IA")
-st.caption("Inteligencia Artificial Biomédica Avanzada")
+st.caption("")
 
 # Si no tenemos llave todavía, la pedimos en la barra lateral
 if not api_key:
@@ -68,3 +68,4 @@ if api_key:
 else:
     # Pantalla de espera si no hay llave
     st.info("👋 ¡Hola! Configura la API Key en los 'Secrets' para empezar.")
+
