@@ -3,6 +3,15 @@ import google.generativeai as genai
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Rob IA", page_icon="🤖", layout="centered")
+# --- OCULTAR ELEMENTOS DE LA INTERFAZ ---
+hide_menu_style = """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        </style>
+        """
+st.markdown(hide_menu_style, unsafe_allow_html=True)
 
 # --- INTENTO DE CARGAR LA LLAVE SECRETA ---
 try:
@@ -68,4 +77,5 @@ if api_key:
 else:
     # Pantalla de espera si no hay llave
     st.info("👋 ¡Hola! Configura la API Key en los 'Secrets' para empezar.")
+
 
