@@ -2,10 +2,10 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# --- CONFIGURACIÓN VISUAL (TIPO GEMINI) ---
+# --- CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="Rob IA", page_icon="✨", layout="wide")
 
-# Estilos CSS para oscurecer la barra y hacerla parecer a Gemini
+# Estilos CSS (Modo Oscuro Gemini)
 estilo_gemini = """
 <style>
     [data-testid="stSidebar"] {
@@ -18,21 +18,20 @@ estilo_gemini = """
         color: #eee;
     }
     .stButton button:hover {
-        border-color: #00d2ff;
-        color: #00d2ff;
+        border-color: #8AB4F8;
+        color: #8AB4F8;
     }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
 </style>
 """
 st.markdown(estilo_gemini, unsafe_allow_html=True)
 
-# --- TUS DATOS DE NEGOCIO ---
+# --- DATOS DE NEGOCIO ---
 LINK_DE_PAGO = "https://carlomars7.gumroad.com/l/fyeoj" 
 CODIGO_SECRETO = "ROB-VIP-2025"
 
-# --- GESTIÓN DE MEMORIA Y SESIÓN ---
+# --- GESTIÓN DE ESTADO ---
 if "historial_chats" not in st.session_state:
-    # Empezamos con un chat vacío
     st.session_state.historial_chats = [{"id": 1, "titulo": "Nuevo Chat", "mensajes": []}]
 if "chat_actual_id" not in st.session_state:
     st.session_state.chat_actual_id = 1
@@ -46,30 +45,24 @@ def crear_chat():
     st.session_state.contador += 1
     nuevo_id = st.session_state.contador
     nuevo_chat = {"id": nuevo_id, "titulo": "Nueva conversación", "mensajes": []}
-    st.session_state.historial_chats.insert(0, nuevo_chat) # Lo pone al principio
+    st.session_state.historial_chats.insert(0, nuevo_chat)
     st.session_state.chat_actual_id = nuevo_id
 
 def cambiar_chat(id_chat):
     st.session_state.chat_actual_id = id_chat
 
-# --- BARRA LATERAL (SIDEBAR) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
-    # 1. BOTÓN GRANDE DE NUEVO CHAT
     if st.button("➕ Nueva conversación", type="primary"):
         crear_chat()
     
     st.markdown("### Reciente")
-    
-    # 2. LISTA DE CHATS ANTERIORES
     for chat in st.session_state.historial_chats:
-        # Si es el chat actual, le ponemos un icono diferente
         icono = "🔹" if chat["id"] == st.session_state.chat_actual_id else "💬"
         if st.button(f"{icono} {chat['titulo']}", key=f"chat_{chat['id']}"):
             cambiar_chat(chat["id"])
 
     st.markdown("---")
-    
-    # 3. ZONA DE CONFIGURACIÓN (TU NEGOCIO)
     with st.expander("⚙️ Configuración"):
         if st.session_state.modo_pro:
             st.success("💎 PLAN PRO ACTIVADO")
@@ -77,9 +70,9 @@ with st.sidebar:
                 st.session_state.modo_pro = False
                 st.rerun()
         else:
-            st.info("Estás en el plan Básico.")
+            st.info("Plan Básico (Gratis)")
             st.markdown(f"[👉 Obtener PRO ($1)]({LINK_DE_PAGO})")
-            codigo = st.text_input("Tengo un código:", type="password")
+            codigo = st.text_input("Código de acceso:", type="password")
             if st.button("Activar"):
                 if codigo == CODIGO_SECRETO:
                     st.session_state.modo_pro = True
@@ -89,49 +82,55 @@ with st.sidebar:
                     st.error("Código incorrecto")
 
 # --- LÓGICA PRINCIPAL ---
-
-# 1. Identificar qué chat estamos viendo
 chat_actual = next((c for c in st.session_state.historial_chats if c["id"] == st.session_state.chat_actual_id), None)
 
-# 2. Cargar API Key
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
 except:
-    st.warning("⚠️ Falta configurar la API KEY en Secrets.")
+    st.warning("⚠️ Falta API KEY en Secrets.")
     st.stop()
 
-# 3. Configurar el Cerebro según el plan
+# --- AQUÍ ESTÁ LA MAGIA DE LA PERSONALIDAD ---
 instrucciones = ""
 if st.session_state.modo_pro:
-    instrucciones = "Eres ROB IA PRO. Experto en biomedicina, ingeniería y visión artificial. Respuestas detalladas."
+    instrucciones = """
+    ERES ROB IA PRO.
+    Rol: Experto Mundial en Ingeniería Biomédica y Ciencias.
+    Tono: Profesional, académico, altamente detallado y técnico.
+    Objetivo: Dar respuestas profundas, citar conceptos complejos y analizar imágenes con precisión clínica.
+    """
     st.title("💎 Rob IA Pro")
 else:
-    instrucciones = "Eres Rob IA Básico. Respuestas breves."
-    st.title("🤖 Rob IA")
+    instrucciones = """
+    ERES ROB IA.
+    Rol: Un asistente inteligente, empático y amigable (Buena onda).
+    Tono: Conversacional, claro y servicial. USA EMOJIS ocasionalmente para ser expresivo. 
+    Objetivo: Explicar las cosas de forma sencilla pero correcta. Si te saludan, responde con entusiasmo.
+    No seas cortante ni robótico.
+    """
+    st.title("✨ Rob IA")
 
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=instrucciones)
 
-# 4. Mostrar mensajes del chat seleccionado
+# MOSTRAR CHAT
 if chat_actual:
     for msg in chat_actual["mensajes"]:
         with st.chat_message(msg["role"]):
-            if isinstance(msg["content"], tuple): # Es una imagen
+            if isinstance(msg["content"], tuple):
                 st.image(msg["content"][0], width=300)
                 st.markdown(msg["content"][1])
             else:
                 st.markdown(msg["content"])
 
-# 5. Zona de Input (Texto e Imagen)
+# INPUT
 img_file = None
 if st.session_state.modo_pro:
-    # Solo los PRO ven el botón de subir foto
     img_file = st.file_uploader("📷 Analizar imagen", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
 
 prompt = st.chat_input("Escribe algo...")
 
 if prompt:
-    # A) Guardar mensaje del usuario
     with st.chat_message("user"):
         if img_file:
             img = Image.open(img_file)
@@ -142,17 +141,14 @@ if prompt:
             st.markdown(prompt)
             chat_actual["mensajes"].append({"role": "user", "content": prompt})
 
-    # B) Poner título al chat si es nuevo
     if len(chat_actual["mensajes"]) == 1:
         chat_actual["titulo"] = prompt[:20] + "..."
         st.rerun()
 
-    # C) Generar respuesta
     with st.chat_message("assistant"):
         placeholder = st.empty()
         full_res = ""
         
-        # Preparamos historial para la IA (solo texto para evitar errores de formato)
         historial_ia = []
         for m in chat_actual["mensajes"][:-1]:
             if not isinstance(m["content"], tuple):
@@ -162,20 +158,15 @@ if prompt:
 
         try:
             if img_file:
-                # Modo Visión
                 response = model.generate_content([prompt, img], stream=True)
             else:
-                # Modo Texto
                 response = chat_session.send_message(prompt, stream=True)
             
             for chunk in response:
                 full_res += chunk.text
                 placeholder.markdown(full_res + "▌")
             placeholder.markdown(full_res)
-            
-            # Guardar respuesta
             chat_actual["mensajes"].append({"role": "assistant", "content": full_res})
             
         except Exception as e:
             st.error(f"Error: {e}")
-
