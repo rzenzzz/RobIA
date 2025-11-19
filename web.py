@@ -1,81 +1,180 @@
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Rob IA", page_icon="🤖", layout="centered")
-# --- OCULTAR ELEMENTOS DE LA INTERFAZ ---
-hide_menu_style = """
-        <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        </style>
-        """
-st.markdown(hide_menu_style, unsafe_allow_html=True)
+# --- CONFIGURACIÓN VISUAL (TIPO GEMINI) ---
+st.set_page_config(page_title="Rob IA", page_icon="✨", layout="wide")
 
-# --- INTENTO DE CARGAR LA LLAVE SECRETA ---
+# Estilos CSS para oscurecer la barra y hacerla parecer a Gemini
+estilo_gemini = """
+<style>
+    [data-testid="stSidebar"] {
+        background-color: #1e1e1e;
+    }
+    .stButton button {
+        width: 100%;
+        border-radius: 20px;
+        border: 1px solid #333;
+        color: #eee;
+    }
+    .stButton button:hover {
+        border-color: #00d2ff;
+        color: #00d2ff;
+    }
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+</style>
+"""
+st.markdown(estilo_gemini, unsafe_allow_html=True)
+
+# --- TUS DATOS DE NEGOCIO ---
+LINK_DE_PAGO = "https://carlomars7.gumroad.com/l/fyeoj" 
+CODIGO_SECRETO = "ROB-VIP-2025"
+
+# --- GESTIÓN DE MEMORIA Y SESIÓN ---
+if "historial_chats" not in st.session_state:
+    # Empezamos con un chat vacío
+    st.session_state.historial_chats = [{"id": 1, "titulo": "Nuevo Chat", "mensajes": []}]
+if "chat_actual_id" not in st.session_state:
+    st.session_state.chat_actual_id = 1
+if "contador" not in st.session_state:
+    st.session_state.contador = 1
+if "modo_pro" not in st.session_state:
+    st.session_state.modo_pro = False
+
+# --- FUNCIONES ---
+def crear_chat():
+    st.session_state.contador += 1
+    nuevo_id = st.session_state.contador
+    nuevo_chat = {"id": nuevo_id, "titulo": "Nueva conversación", "mensajes": []}
+    st.session_state.historial_chats.insert(0, nuevo_chat) # Lo pone al principio
+    st.session_state.chat_actual_id = nuevo_id
+
+def cambiar_chat(id_chat):
+    st.session_state.chat_actual_id = id_chat
+
+# --- BARRA LATERAL (SIDEBAR) ---
+with st.sidebar:
+    # 1. BOTÓN GRANDE DE NUEVO CHAT
+    if st.button("➕ Nueva conversación", type="primary"):
+        crear_chat()
+    
+    st.markdown("### Reciente")
+    
+    # 2. LISTA DE CHATS ANTERIORES
+    for chat in st.session_state.historial_chats:
+        # Si es el chat actual, le ponemos un icono diferente
+        icono = "🔹" if chat["id"] == st.session_state.chat_actual_id else "💬"
+        if st.button(f"{icono} {chat['titulo']}", key=f"chat_{chat['id']}"):
+            cambiar_chat(chat["id"])
+
+    st.markdown("---")
+    
+    # 3. ZONA DE CONFIGURACIÓN (TU NEGOCIO)
+    with st.expander("⚙️ Configuración"):
+        if st.session_state.modo_pro:
+            st.success("💎 PLAN PRO ACTIVADO")
+            if st.button("Cerrar sesión"):
+                st.session_state.modo_pro = False
+                st.rerun()
+        else:
+            st.info("Estás en el plan Básico.")
+            st.markdown(f"[👉 Obtener PRO ($1)]({LINK_DE_PAGO})")
+            codigo = st.text_input("Tengo un código:", type="password")
+            if st.button("Activar"):
+                if codigo == CODIGO_SECRETO:
+                    st.session_state.modo_pro = True
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("Código incorrecto")
+
+# --- LÓGICA PRINCIPAL ---
+
+# 1. Identificar qué chat estamos viendo
+chat_actual = next((c for c in st.session_state.historial_chats if c["id"] == st.session_state.chat_actual_id), None)
+
+# 2. Cargar API Key
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
 except:
-    # Si no hay secreto, la pedimos manual (por si acaso)
-    api_key = ""
+    st.warning("⚠️ Falta configurar la API KEY en Secrets.")
+    st.stop()
 
-# --- INTERFAZ ---
-st.title("🤖 Rob IA")
-st.caption("")
-
-# Si no tenemos llave todavía, la pedimos en la barra lateral
-if not api_key:
-    with st.sidebar:
-        st.warning("⚠️ Modo Desarrollador")
-        api_key = st.text_input("Ingresa la API Key:", type="password")
-
-# --- CEREBRO ---
-if api_key:
-    # Configuración del modelo
-    genai.configure(api_key=api_key)
-    
-    instrucciones = """
-    Eres Rob IA, un asistente experto y amigable.
-    1. Tu especialidad es Ingeniería Biomédica, Medicina y Tecnología.
-    2. Responde de forma clara, estructurada y útil.
-    3. Si te saludan, preséntate como Rob IA.
-    """
-    
-    model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=instrucciones)
-
-    # Historial
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Chat
-    if prompt := st.chat_input("Escribe tu consulta médica o técnica..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            try:
-                chat = model.start_chat(history=[
-                    {"role": m["role"], "parts": [m["content"]]} 
-                    for m in st.session_state.messages[:-1]
-                ])
-                full_response = ""
-                response = chat.send_message(prompt, stream=True)
-                for chunk in response:
-                    full_response += chunk.text
-                    message_placeholder.markdown(full_response + "▌")
-                message_placeholder.markdown(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-            except Exception as e:
-                st.error(f"Error: {e}")
+# 3. Configurar el Cerebro según el plan
+instrucciones = ""
+if st.session_state.modo_pro:
+    instrucciones = "Eres ROB IA PRO. Experto en biomedicina, ingeniería y visión artificial. Respuestas detalladas."
+    st.title("💎 Rob IA Pro")
 else:
-    # Pantalla de espera si no hay llave
-    st.info("👋 ¡Hola! Configura la API Key en los 'Secrets' para empezar.")
+    instrucciones = "Eres Rob IA Básico. Respuestas breves."
+    st.title("🤖 Rob IA")
 
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=instrucciones)
 
+# 4. Mostrar mensajes del chat seleccionado
+if chat_actual:
+    for msg in chat_actual["mensajes"]:
+        with st.chat_message(msg["role"]):
+            if isinstance(msg["content"], tuple): # Es una imagen
+                st.image(msg["content"][0], width=300)
+                st.markdown(msg["content"][1])
+            else:
+                st.markdown(msg["content"])
+
+# 5. Zona de Input (Texto e Imagen)
+img_file = None
+if st.session_state.modo_pro:
+    # Solo los PRO ven el botón de subir foto
+    img_file = st.file_uploader("📷 Analizar imagen", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+
+prompt = st.chat_input("Escribe algo...")
+
+if prompt:
+    # A) Guardar mensaje del usuario
+    with st.chat_message("user"):
+        if img_file:
+            img = Image.open(img_file)
+            st.image(img, width=300)
+            st.markdown(prompt)
+            chat_actual["mensajes"].append({"role": "user", "content": (img, prompt)})
+        else:
+            st.markdown(prompt)
+            chat_actual["mensajes"].append({"role": "user", "content": prompt})
+
+    # B) Poner título al chat si es nuevo
+    if len(chat_actual["mensajes"]) == 1:
+        chat_actual["titulo"] = prompt[:20] + "..."
+        st.rerun()
+
+    # C) Generar respuesta
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        full_res = ""
+        
+        # Preparamos historial para la IA (solo texto para evitar errores de formato)
+        historial_ia = []
+        for m in chat_actual["mensajes"][:-1]:
+            if not isinstance(m["content"], tuple):
+                historial_ia.append({"role": m["role"], "parts": [m["content"]]})
+
+        chat_session = model.start_chat(history=historial_ia)
+
+        try:
+            if img_file:
+                # Modo Visión
+                response = model.generate_content([prompt, img], stream=True)
+            else:
+                # Modo Texto
+                response = chat_session.send_message(prompt, stream=True)
+            
+            for chunk in response:
+                full_res += chunk.text
+                placeholder.markdown(full_res + "▌")
+            placeholder.markdown(full_res)
+            
+            # Guardar respuesta
+            chat_actual["mensajes"].append({"role": "assistant", "content": full_res})
+            
+        except Exception as e:
+            st.error(f"Error: {e}")
