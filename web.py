@@ -3,34 +3,76 @@ import google.generativeai as genai
 from PIL import Image
 
 # --- CONFIGURACIÓN VISUAL ---
-st.set_page_config(page_title="Rob IA", page_icon="✨", layout="wide")
+st.set_page_config(page_title="Rob IA", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# Estilos CSS (Modo Oscuro Gemini)
-estilo_gemini = """
+# --- ESTILOS HÍBRIDOS (Estructura Gemini + Look Gamer RGB) ---
+estilo_final = """
 <style>
-    [data-testid="stSidebar"] {
-        background-color: #1e1e1e;
+    /* 1. ANIMACIÓN BORDE RGB (ESTILO GAMER) */
+    @keyframes borde_rgb {
+        0% { border-right: 3px solid #ff0000; box-shadow: 5px 0 15px rgba(255, 0, 0, 0.3); }
+        25% { border-right: 3px solid #00ff00; box-shadow: 5px 0 15px rgba(0, 255, 0, 0.3); }
+        50% { border-right: 3px solid #0000ff; box-shadow: 5px 0 15px rgba(0, 0, 255, 0.3); }
+        75% { border-right: 3px solid #ffff00; box-shadow: 5px 0 15px rgba(255, 255, 0, 0.3); }
+        100% { border-right: 3px solid #ff00ff; box-shadow: 5px 0 15px rgba(255, 0, 255, 0.3); }
     }
+
+    /* 2. PANEL LATERAL (OSCURO Y CON BORDE ANIMADO) */
+    [data-testid="stSidebar"] {
+        background-color: #0e0e0e;
+        animation: borde_rgb 8s infinite alternate;
+    }
+
+    /* 3. BOTONES (ESTILO GEMINI PERO NEÓN) */
     .stButton button {
         width: 100%;
-        border-radius: 20px;
+        border-radius: 20px; /* Redondeado tipo Google */
+        background: linear-gradient(145deg, #1a1a1a, #222);
         border: 1px solid #333;
-        color: #eee;
+        color: #ccc;
+        font-weight: 500;
+        padding: 10px;
+        text-align: left; /* Texto alineado a la izquierda como historial */
+        transition: all 0.3s ease;
     }
+    
+    /* Efecto Hover (Al pasar el mouse) */
     .stButton button:hover {
-        border-color: #8AB4F8;
-        color: #8AB4F8;
+        border-color: #00d2ff;
+        color: #00d2ff;
+        box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+        padding-left: 15px; /* Pequeño movimiento a la derecha */
     }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+
+    /* 4. BOTÓN PRIMARIO ("NUEVO CHAT") DESTACADO */
+    div[data-testid="stSidebar"] .stButton:first-child button {
+        background: #1e1e1e;
+        border: 1px solid #444;
+        text-align: center; /* El botón principal centrado */
+        margin-bottom: 20px;
+    }
+
+    /* 5. TÍTULO CON GRADIENTE */
+    h1 {
+        background: -webkit-linear-gradient(left, #00c6ff, #0072ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    /* 6. LIMPIEZA DE INTERFAZ */
+    #MainMenu {visibility: hidden;} 
+    footer {visibility: hidden;} 
+    [data-testid="stSidebarNav"] {display: none;} /* Oculta navegación fea */
+    [data-testid="collapsedControl"] {display: block; color: white;} /* Muestra flechita menú */
 </style>
 """
-st.markdown(estilo_gemini, unsafe_allow_html=True)
+st.markdown(estilo_final, unsafe_allow_html=True)
 
 # --- DATOS DE NEGOCIO ---
 LINK_DE_PAGO = "https://carlomars7.gumroad.com/l/fyeoj" 
 CODIGO_SECRETO = "ROB-VIP-2025"
 
-# --- GESTIÓN DE ESTADO ---
+# --- VARIABLES DE MEMORIA ---
 if "historial_chats" not in st.session_state:
     st.session_state.historial_chats = [{"id": 1, "titulo": "Nuevo Chat", "mensajes": []}]
 if "chat_actual_id" not in st.session_state:
@@ -51,69 +93,76 @@ def crear_chat():
 def cambiar_chat(id_chat):
     st.session_state.chat_actual_id = id_chat
 
-# --- BARRA LATERAL ---
+# --- BARRA LATERAL (LAYOUT TIPO GEMINI) ---
 with st.sidebar:
+    # A. BOTÓN SUPERIOR (NUEVA CONVERSACIÓN)
     if st.button("➕ Nueva conversación", type="primary"):
         crear_chat()
     
-    st.markdown("### Reciente")
-    for chat in st.session_state.historial_chats:
-        icono = "🔹" if chat["id"] == st.session_state.chat_actual_id else "💬"
-        if st.button(f"{icono} {chat['titulo']}", key=f"chat_{chat['id']}"):
-            cambiar_chat(chat["id"])
-
+    # B. LISTA DE RECIENTES (EN MEDIO)
+    st.caption("Reciente")
+    # Contenedor con scroll para chats si son muchos
+    with st.container():
+        for chat in st.session_state.historial_chats:
+            # Icono diferente si es el chat activo
+            icono = "🟦" if chat["id"] == st.session_state.chat_actual_id else "🗨️"
+            # Cortamos el título si es muy largo
+            titulo_corto = (chat['titulo'][:22] + '..') if len(chat['titulo']) > 22 else chat['titulo']
+            
+            if st.button(f"{icono} {titulo_corto}", key=f"chat_{chat['id']}"):
+                cambiar_chat(chat["id"])
+    
+    # Espaciador visual
     st.markdown("---")
-    with st.expander("⚙️ Configuración"):
+
+    # C. CONFIGURACIÓN (ABAJO)
+    with st.expander("⚙️ Configuración VIP"):
         if st.session_state.modo_pro:
-            st.success("💎 PLAN PRO ACTIVADO")
+            st.success("💎 PLAN PRO: ACTIVO")
             if st.button("Cerrar sesión"):
                 st.session_state.modo_pro = False
                 st.rerun()
         else:
-            st.info("Plan Básico (Gratis)")
-            st.markdown(f"[👉 Obtener PRO ($1)]({LINK_DE_PAGO})")
-            codigo = st.text_input("Código de acceso:", type="password")
+            st.info("👤 Plan Gratuito")
+            st.markdown(f"🔥 **[Desbloquear PRO ($1)]({LINK_DE_PAGO})**")
+            codigo = st.text_input("Llave de acceso:", type="password")
             if st.button("Activar"):
                 if codigo == CODIGO_SECRETO:
                     st.session_state.modo_pro = True
                     st.balloons()
                     st.rerun()
                 else:
-                    st.error("Código incorrecto")
+                    st.error("Llave incorrecta")
 
-# --- LÓGICA PRINCIPAL ---
+# --- CEREBRO IA ---
 chat_actual = next((c for c in st.session_state.historial_chats if c["id"] == st.session_state.chat_actual_id), None)
 
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
 except:
-    st.warning("⚠️ Falta API KEY en Secrets.")
+    st.error("⚠️ Falta la API KEY en Secrets.")
     st.stop()
 
-# --- AQUÍ ESTÁ LA MAGIA DE LA PERSONALIDAD ---
-instrucciones = ""
+# Personalidad
 if st.session_state.modo_pro:
     instrucciones = """
     ERES ROB IA PRO.
-    Rol: Experto Mundial en Ingeniería Biomédica y Ciencias.
-    Tono: Profesional, académico, altamente detallado y técnico.
-    Objetivo: Dar respuestas profundas, citar conceptos complejos y analizar imágenes con precisión clínica.
+    Experto Mundial en Tecnología, Biomedicina e Ingeniería.
+    Responde con profundidad técnica y precisión académica.
     """
     st.title("💎 Rob IA Pro")
 else:
     instrucciones = """
     ERES ROB IA.
-    Rol: Un asistente inteligente, empático y amigable (Buena onda).
-    Tono: Conversacional, claro y servicial. USA EMOJIS ocasionalmente para ser expresivo. 
-    Objetivo: Explicar las cosas de forma sencilla pero correcta. Si te saludan, responde con entusiasmo.
-    No seas cortante ni robótico.
+    Asistente amigable, carismático y 'buena onda'.
+    Usa emojis. Responde de forma clara y útil.
     """
-    st.title("✨ Rob IA")
+    st.title("⚡ Rob IA")
 
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=instrucciones)
 
-# MOSTRAR CHAT
+# MOSTRAR MENSAJES
 if chat_actual:
     for msg in chat_actual["mensajes"]:
         with st.chat_message(msg["role"]):
@@ -126,9 +175,9 @@ if chat_actual:
 # INPUT
 img_file = None
 if st.session_state.modo_pro:
-    img_file = st.file_uploader("📷 Analizar imagen", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+    img_file = st.file_uploader("📷 Analizar imagen (Solo VIP)", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
 
-prompt = st.chat_input("Escribe algo...")
+prompt = st.chat_input("Escribe aquí...")
 
 if prompt:
     with st.chat_message("user"):
@@ -141,8 +190,9 @@ if prompt:
             st.markdown(prompt)
             chat_actual["mensajes"].append({"role": "user", "content": prompt})
 
+    # Ponemos título al chat si es el primer mensaje
     if len(chat_actual["mensajes"]) == 1:
-        chat_actual["titulo"] = prompt[:20] + "..."
+        chat_actual["titulo"] = prompt
         st.rerun()
 
     with st.chat_message("assistant"):
