@@ -5,10 +5,11 @@ from PIL import Image
 # --- CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="Rob IA", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# --- ESTILOS VISUALES (GAMER RGB) ---
-estilo_final = """
+# --- ESTILOS BASE (SIEMPRE ACTIVOS) ---
+# Esto mantiene el panel izquierdo RGB y el diseño Gemini
+estilo_base = """
 <style>
-    /* 1. DEFINICIÓN DE COLORES RGB */
+    /* 1. ANIMACIÓN RGB */
     @keyframes borde_rgb {
         0% { border-color: #ff0000; box-shadow: 0 0 10px rgba(255, 0, 0, 0.4); }
         25% { border-color: #00ff00; box-shadow: 0 0 10px rgba(0, 255, 0, 0.4); }
@@ -17,30 +18,14 @@ estilo_final = """
         100% { border-color: #ff00ff; box-shadow: 0 0 10px rgba(255, 0, 255, 0.4); }
     }
 
-    /* 2. PANEL LATERAL (Solo borde derecho RGB) */
+    /* 2. PANEL LATERAL (Siempre tiene RGB) */
     [data-testid="stSidebar"] {
         background-color: #0e0e0e;
         border-right: 3px solid;
         animation: borde_rgb 8s infinite alternate;
     }
 
-    /* 3. INPUT DE CHAT (LA CAJA DONDE ESCRIBES) */
-    .stChatInput textarea, .stChatInput input {
-        background-color: #1e1e1e !important;
-        color: white !important;
-        border: 2px solid transparent !important;
-        border-radius: 15px !important;
-    }
-    
-    /* Esto hace que la cajita brille en RGB */
-    div[data-testid="stChatInput"] > div {
-        border-radius: 15px !important;
-        border: 2px solid;
-        animation: borde_rgb 5s infinite alternate;
-        background-color: transparent !important;
-    }
-
-    /* 4. BOTONES (ESTILO NEÓN) */
+    /* 3. BOTONES (Estilo Neón) */
     .stButton button {
         width: 100%;
         border-radius: 20px;
@@ -67,20 +52,38 @@ estilo_final = """
         margin-bottom: 20px;
     }
 
-    /* 5. LIMPIEZA DE INTERFAZ */
+    /* 4. LIMPIEZA */
     #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;} 
     [data-testid="stSidebarNav"] {display: none;}
     [data-testid="collapsedControl"] {display: block; color: white;}
 </style>
 """
-st.markdown(estilo_final, unsafe_allow_html=True)
+st.markdown(estilo_base, unsafe_allow_html=True)
+
+# --- ESTILO CONDICIONAL (SOLO PARA PRO) ---
+# Este CSS solo se inyecta si el modo PRO es True
+estilo_input_pro = """
+<style>
+    /* Hace que la cajita de escribir brille en RGB */
+    .stChatInput textarea, .stChatInput input {
+        background-color: #1e1e1e !important;
+        color: white !important;
+    }
+    div[data-testid="stChatInput"] > div {
+        border-radius: 15px !important;
+        border: 2px solid;
+        animation: borde_rgb 5s infinite alternate; /* Usa la misma animación que el panel */
+        background-color: transparent !important;
+    }
+</style>
+"""
 
 # --- DATOS DE NEGOCIO ---
 LINK_DE_PAGO = "https://carlomars7.gumroad.com/l/fyeoj" 
 CODIGO_SECRETO = "ROB-VIP-2025"
 
-# --- VARIABLES DE MEMORIA ---
+# --- MEMORIA ---
 if "historial_chats" not in st.session_state:
     st.session_state.historial_chats = [{"id": 1, "titulo": "Nuevo Chat", "mensajes": []}]
 if "chat_actual_id" not in st.session_state:
@@ -134,27 +137,33 @@ with st.sidebar:
                 else:
                     st.error("Llave incorrecta")
 
-# --- CEREBRO IA ---
+# --- LÓGICA DE CEREBRO Y ESTILOS ---
 chat_actual = next((c for c in st.session_state.historial_chats if c["id"] == st.session_state.chat_actual_id), None)
 
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
 except:
-    st.error("⚠️ Falta la API KEY en Secrets.")
+    st.error("⚠️ Falta API KEY en Secrets.")
     st.stop()
 
+# AQUI APLICAMOS LA LÓGICA QUE PEDISTE:
 if st.session_state.modo_pro:
+    # 1. Activamos el estilo RGB en el input
+    st.markdown(estilo_input_pro, unsafe_allow_html=True)
+    
+    # 2. Instrucciones PRO
     instrucciones = """
     ERES ROB IA PRO.
-    Experto Mundial en Tecnología, Biomedicina e Ingeniería.
-    Responde con profundidad técnica y precisión académica.
+    Experto Mundial en Tecnología y Biomedicina.
+    Responde con profundidad técnica.
     """
     st.title("💎 Rob IA Pro")
 else:
+    # MODO GRATIS (Sin estilo RGB en input)
     instrucciones = """
     ERES ROB IA.
-    Asistente amigable, carismático y 'buena onda'.
-    Usa emojis. Responde de forma clara y útil.
+    Asistente amigable y carismático.
+    Usa emojis.
     """
     st.title("⚡ Rob IA")
 
